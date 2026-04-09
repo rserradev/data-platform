@@ -5,59 +5,102 @@ from datetime import datetime
 import requests
 import psycopg2
 import json
+import boto3
+import pyarrow as pa
+import pyarrow.parquet as pq
+import io
 
 DB_CONN = {
     "host": "postgres",
     "port": 5432,
     "dbname": "airflow",
     "user": "airflow",
-    "password": "airflow"
+    "password": "airflow",
 }
 
-# Lista de monedas a seguir
+# Configuración de MinIO
+MINIO_CONN = {
+    "endpoint_url": "http://minio:9000",
+    "aws_access_key_id": "minioadmin",
+    "aws_secret_access_key": "minioadmin",
+}
+
+BUCKET = "crypto-bronze"
 COINS = ["bitcoin", "ethereum", "solana", "cardano"]
 
+
 def fetch_prices():
-    # 1. Llamar a la API de CoinGecko para obtener el precio actual de Bitcoin
+    # 1. Llamar a la API
     url = "https://api.coingecko.com/api/v3/coins/markets"
     params = {
         "vs_currency": "usd",
-        "ids": ", ".join(COINS),
+        "ids": ",".join(COINS),
     }
     response = requests.get(url, params=params, timeout=30)
     data = response.json()
     print(f"Monedas recibidas: {len(data)}")
 
-    # 2. Insertar cada moneda en bronze
-    conn = psycopg2.connect(**DB_CONN)
-    try:
-        with conn.cursor() as cur:
-            for coin in data:
-                cur.execute(
-                    "INSERT INTO bronze.prices (coin_id, raw_payload) VALUES (%s, %s)",
-                    (coin["id"], json.dumps(coin))
-                )
-                print(f"Bronze: {coin['name']} - ${coin['current_price']}")
-        conn.commit()
-        print(f"Total insertado en bronze: {len(data)} monedas")
-    finally:
-        conn.close()
+    # 2. Conectar a MinIO
+    s3 = boto3.client("s3", **MINIO_CONN)
+
+    # 3. Guardar cada moneda como archivo Parquet en MinIO
+    fecha = datetime.utcnow().strftime("%Y-%m-%d")
+    timestamp = int(datetime.utcnow().timestamp())
+
+    for coin in data:
+        # Convertir a tabla Parquet
+        table = pa.table({
+            "coin_id":       [coin["id"]],
+            "symbol":        [coin["symbol"]],
+            "name":          [coin["name"]],
+            "price_usd":     [float(coin["current_price"])],
+            "market_cap":    [float(coin["market_cap"] or 0)],
+            "volume_24h":    [float(coin["total_volume"] or 0)],
+            "change_24h":    [float(coin["price_change_percentage_24h"] or 0)],
+            "fetched_at":    [datetime.utcnow().isoformat()],
+            "raw_json":      [json.dumps(coin)],
+        })
+
+        # Escribir Parquet en memoria
+        buffer = io.BytesIO()
+        pq.write_table(table, buffer)
+        buffer.seek(0)
+
+        # Subir a MinIO
+        key = f"prices/{fecha}/{coin['id']}_{timestamp}.parquet"
+        s3.put_object(Bucket=BUCKET, Key=key, Body=buffer.getvalue())
+        print(f"MinIO: {coin['name']} → {key}")
+
 
 def transform_to_silver():
+    # Conectar a MinIO y leer los archivos de hoy
+    s3 = boto3.client("s3", **MINIO_CONN)
+    fecha = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Listar archivos de hoy
+    response = s3.list_objects_v2(Bucket=BUCKET, Prefix=f"prices/{fecha}/")
+    archivos = response.get("Contents", [])
+    print(f"Archivos encontrados en MinIO: {len(archivos)}")
+
+    # Leer el archivo más reciente de cada moneda
+    ultimos = {}
+    for obj in archivos:
+        key = obj["Key"]
+        coin_id = key.split("/")[-1].split("_")[0]
+        if coin_id not in ultimos or key > ultimos[coin_id]:
+            ultimos[coin_id] = key
+
+    # Insertar en silver
     conn = psycopg2.connect(**DB_CONN)
     try:
         with conn.cursor() as cur:
-            # Leer los últimos registros de bronze (uno por moneda)
-            cur.execute("""
-                SELECT DISTINCT ON (coin_id) coin_id, raw_payload, ingested_at
-                FROM bronze.prices
-                ORDER BY coin_id, ingested_at DESC
-            """)
-            rows = cur.fetchall()
-            print(f"Procesando {len(rows)} monedas desde bronze")
+            for coin_id, key in ultimos.items():
+                # Descargar archivo Parquet
+                obj = s3.get_object(Bucket=BUCKET, Key=key)
+                buffer = io.BytesIO(obj["Body"].read())
+                table = pq.read_table(buffer)
+                row = table.to_pydict()
 
-            for row in rows:
-                coin_id, payload, ingested_at = row
                 cur.execute("""
                     INSERT INTO silver.prices (
                         coin_id, symbol, name, price_usd,
@@ -65,20 +108,21 @@ def transform_to_silver():
                         price_change_24h, fetched_at
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
-                    payload["id"],
-                    payload["symbol"],
-                    payload["name"],
-                    payload["current_price"],
-                    payload["market_cap"],
-                    payload["total_volume"],
-                    payload["price_change_percentage_24h"],
-                    ingested_at,
+                    row["coin_id"][0],
+                    row["symbol"][0],
+                    row["name"][0],
+                    row["price_usd"][0],
+                    row["market_cap"][0],
+                    row["volume_24h"][0],
+                    row["change_24h"][0],
+                    row["fetched_at"][0],
                 ))
-                print(f"Silver: {payload['name']} - ${payload['current_price']}")
+                print(f"Silver: {row['name'][0]} - ${row['price_usd'][0]}")
         conn.commit()
         print("Transformación a silver completada")
     finally:
         conn.close()
+
 
 with DAG(
     dag_id="crypto_pipeline",
@@ -102,5 +146,4 @@ with DAG(
         bash_command="cd /opt/airflow/dbt_project && dbt run --profiles-dir profiles",
     )
 
-    # Orden de ejecución: primero fetch, luego transform
     tarea_fetch >> tarea_silver >> tarea_dbt
