@@ -46,6 +46,8 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       _PIP_ADDITIONAL_REQUIREMENTS: "dbt-postgres==1.7.0"
+      BCENTRAL_USER: ${BCENTRAL_USER}
+      BCENTRAL_PASSWORD: ${BCENTRAL_PASSWORD}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -65,6 +67,8 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       _PIP_ADDITIONAL_REQUIREMENTS: "dbt-postgres==1.7.0"
+      BCENTRAL_USER: ${BCENTRAL_USER}
+      BCENTRAL_PASSWORD: ${BCENTRAL_PASSWORD}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
