@@ -1,5 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import requests
@@ -42,7 +43,6 @@ BUCKET = "bcentral-bronze"
 
 # URL base de la API del Banco Central
 BASE_URL = "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx"
-
 
 
 # Funcion para traer indicadores en capa bronze
@@ -150,7 +150,10 @@ def transform_to_silver():
                         (
                             df["indicador"][i],
                             df["serie_id"][i],
-                            datetime.strptime(df["fecha"][i], "%d-%m-%Y").strftime("%Y-%m-%d"),                            float(df["valor"][i]),
+                            datetime.strptime(df["fecha"][i], "%d-%m-%Y").strftime(
+                                "%Y-%m-%d"
+                            ),
+                            float(df["valor"][i]),
                             df["fetched_at"][i],
                         ),
                     )
@@ -161,6 +164,7 @@ def transform_to_silver():
         print("Transformación a silver completada")
     finally:
         conn.close()
+
 
 with DAG(
     dag_id="bcentral_pipeline",
@@ -186,8 +190,12 @@ with DAG(
         python_callable=transform_to_silver,
     )
 
-    tarea_fetch >> tarea_silver
+    tarea_dbt = BashOperator(
+        task_id="run_dbt",
+        bash_command="cd /opt/airflow/dbt_project && dbt run --profiles-dir profiles --select bcentral",
+    )
 
+    tarea_fetch >> tarea_silver >> tarea_dbt
 
 if __name__ == "__main__":
     fetch_indicators()

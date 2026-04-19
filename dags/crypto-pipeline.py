@@ -40,8 +40,14 @@ def fetch_prices():
     data = response.json()
     print(f"Monedas recibidas: {len(data)}")
 
-    # 2. Conectar a MinIO
+    # 2. Crear cliente de MinIO
     s3 = boto3.client("s3", **MINIO_CONN)
+
+    try:
+        s3.create_bucket(Bucket=BUCKET)
+        print(f"Bucket '{BUCKET}' creado en MinIO")
+    except Exception:
+        print(f"Bucket '{BUCKET}' ya existe en MinIO")
 
     # 3. Guardar cada moneda como archivo Parquet en MinIO
     fecha = datetime.utcnow().strftime("%Y-%m-%d")
@@ -143,7 +149,7 @@ with DAG(
 
     tarea_dbt = BashOperator(
         task_id="run_dbt",
-        bash_command="cd /opt/airflow/dbt_project && dbt run --profiles-dir profiles",
+        bash_command="cd /opt/airflow/dbt_project && dbt run --profiles-dir profiles --select gold",
     )
 
     tarea_fetch >> tarea_silver >> tarea_dbt
