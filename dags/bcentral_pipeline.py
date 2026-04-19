@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import requests
 import psycopg2
 import boto3
@@ -43,14 +44,18 @@ BUCKET = "bcentral-bronze"
 BASE_URL = "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx"
 
 
+
 # Funcion para traer indicadores en capa bronze
 def fetch_indicators():
+
+    santiago = ZoneInfo("America/Santiago")
+    ahora = datetime.now(santiago)
     # Fecha de ayer
-    ayer = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    ayer = (ahora - timedelta(days=1)).strftime("%Y-%m-%d")
     print(f"Consultando indicadores para: {ayer}")
 
     # Definir la fecha de ingesta
-    fecha_actual = datetime.utcnow().strftime("%Y-%m-%d")
+    fecha_actual = ahora.strftime("%Y-%m-%d")
     print(f"Fecha de ingesta: {fecha_actual}")
 
     # Conectar a MinIO
@@ -89,7 +94,7 @@ def fetch_indicators():
                 "fecha": [obs["indexDateString"] for obs in observaciones],
                 "valor": [obs["value"] for obs in observaciones],
                 "status": [obs["statusCode"] for obs in observaciones],
-                "fetched_at": [datetime.utcnow().isoformat()] * len(observaciones),
+                "fetched_at": [ahora.isoformat()] * len(observaciones),
             }
         )
 
@@ -108,7 +113,8 @@ def transform_to_silver():
     # Crear coneixón a MinIO
     s3 = boto3.client("s3", **MINIO_CONN)
 
-    fecha_actual = datetime.utcnow().strftime("%Y-%m-%d")
+    santiago = ZoneInfo("America/Santiago")
+    fecha_actual = datetime.now(santiago).strftime("%Y-%m-%d")
 
     # Listar todos los archivos dentro del bucket que esten con el prefijo de la fecha actual
     response = s3.list_objects_v2(Bucket=BUCKET, Prefix=f"indicators/{fecha_actual}/")
@@ -139,6 +145,7 @@ def transform_to_silver():
                             indicador, serie_id, fecha,
                             valor, fetched_at
                         ) VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (indicador, fecha) DO NOTHING
                     """,
                         (
                             df["indicador"][i],
