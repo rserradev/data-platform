@@ -8,9 +8,9 @@ model-paths: ["models"]
 
 models:
   data_platform:
-    gold:
+    crypto:
       +materialized: table
-      +schema: gold
+      +schema: crypto
     bcentral:
       +materialized: table
       +schema: bcentral

@@ -108,7 +108,7 @@ def transform_to_silver():
                 row = table.to_pydict()
 
                 cur.execute("""
-                    INSERT INTO silver.prices (
+                    INSERT INTO crypto.silver_prices (
                         coin_id, symbol, name, price_usd,
                         market_cap_usd, volume_24h_usd,
                         price_change_24h, fetched_at
@@ -149,7 +149,7 @@ with DAG(
 
     tarea_dbt = BashOperator(
         task_id="run_dbt",
-        bash_command="cd /opt/airflow/dbt_project && dbt run --profiles-dir profiles --select gold",
+        bash_command="cd /opt/airflow/dbt_project && dbt run --profiles-dir profiles --select crypto",
     )
 
     tarea_fetch >> tarea_silver >> tarea_dbt

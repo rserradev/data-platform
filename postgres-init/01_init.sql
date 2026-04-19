@@ -1,10 +1,8 @@
--- Schemas medallion
-CREATE SCHEMA IF NOT EXISTS bronze;
-CREATE SCHEMA IF NOT EXISTS silver;
-CREATE SCHEMA IF NOT EXISTS gold;
+-- Schema para el pipeline de criptomonedas
+CREATE SCHEMA IF NOT EXISTS crypto;
 
 -- Tabla bronze: datos crudos de la API
-CREATE TABLE IF NOT EXISTS bronze.prices (
+CREATE TABLE IF NOT EXISTS crypto.bronze_prices (
     id          SERIAL PRIMARY KEY,
     ingested_at TIMESTAMPTZ DEFAULT NOW(),
     coin_id     TEXT NOT NULL,
@@ -12,7 +10,7 @@ CREATE TABLE IF NOT EXISTS bronze.prices (
 );
 
 -- Tabla silver: datos limpios y tipados
-CREATE TABLE IF NOT EXISTS silver.prices (
+CREATE TABLE IF NOT EXISTS crypto.silver_prices (
     id               SERIAL PRIMARY KEY,
     coin_id          TEXT NOT NULL,
     symbol           TEXT NOT NULL,
