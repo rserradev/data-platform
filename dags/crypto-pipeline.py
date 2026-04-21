@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import requests
 import psycopg2
 import json
@@ -29,6 +30,9 @@ BUCKET = "crypto-bronze"
 COINS = ["bitcoin", "ethereum", "solana", "cardano"]
 
 def fetch_prices():
+    fecha_santago = ZoneInfo("America/Santiago")
+    ahora = datetime.now(fecha_santago)
+    print(f"Ejecutando fetch_prices a las {ahora.isoformat()}")
 
     # 1. Llamar a la API
     url = "https://api.coingecko.com/api/v3/coins/markets"
@@ -50,8 +54,9 @@ def fetch_prices():
         print(f"Bucket '{BUCKET}' ya existe en MinIO")
 
     # 3. Guardar cada moneda como archivo Parquet en MinIO
-    fecha = datetime.utcnow().strftime("%Y-%m-%d")
-    timestamp = int(datetime.utcnow().timestamp())
+
+    fecha = datetime.now(fecha_santago).strftime("%Y-%m-%d")
+    timestamp = int(datetime.now(fecha_santago).timestamp())
 
     for coin in data:
         # Convertir a tabla Parquet
@@ -63,7 +68,7 @@ def fetch_prices():
             "market_cap":    [float(coin["market_cap"] or 0)],
             "volume_24h":    [float(coin["total_volume"] or 0)],
             "change_24h":    [float(coin["price_change_percentage_24h"] or 0)],
-            "fetched_at":    [datetime.utcnow().isoformat()],
+            "fetched_at":    [datetime.now(fecha_santago).isoformat()],
             "raw_json":      [json.dumps(coin)],
         })
 
