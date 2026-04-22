@@ -48,8 +48,8 @@ BASE_URL = "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx"
 # Funcion para traer indicadores en capa bronze
 def fetch_indicators():
 
-    santiago = ZoneInfo("America/Santiago")
-    ahora = datetime.now(santiago)
+    fecha_santiago = ZoneInfo("America/Santiago")
+    ahora = datetime.now(fecha_santiago)
     # Fecha de ayer
     ayer = (ahora - timedelta(days=1)).strftime("%Y-%m-%d")
     print(f"Consultando indicadores para: {ayer}")
@@ -113,8 +113,8 @@ def transform_to_silver():
     # Crear coneixón a MinIO
     s3 = boto3.client("s3", **MINIO_CONN)
 
-    santiago = ZoneInfo("America/Santiago")
-    fecha_actual = datetime.now(santiago).strftime("%Y-%m-%d")
+    fecha_santiago = ZoneInfo("America/Santiago")
+    fecha_actual = datetime.now(fecha_santiago).strftime("%Y-%m-%d")
 
     # Listar todos los archivos dentro del bucket que esten con el prefijo de la fecha actual
     response = s3.list_objects_v2(Bucket=BUCKET, Prefix=f"indicators/{fecha_actual}/")
