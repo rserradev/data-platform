@@ -1,3 +1,31 @@
+# Bloque reutilizable: configuración común a todos los servicios Airflow
+# El prefijo "x-" indica a Docker Compose que es una extensión (no un servicio)
+# El anchor "&airflow-common" permite referenciarlo más abajo
+x-airflow-common: &airflow-common
+  build: .
+  environment:
+    # Conexión a la metastore de Airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    # Configuración SMTP para envío de correos desde DAGs
+    AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+    AIRFLOW__SMTP__SMTP_PORT: "587"
+    AIRFLOW__SMTP__SMTP_STARTTLS: "True"
+    AIRFLOW__SMTP__SMTP_SSL: "False"
+    AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
+    AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_MAIL_FROM}
+    # Credenciales API Banco Central (ya las tenías)
+    BCENTRAL_USER: ${BCENTRAL_USER}
+    BCENTRAL_PASSWORD: ${BCENTRAL_PASSWORD}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./dbt_project:/opt/airflow/dbt_project
+  depends_on:
+    postgres:
+      condition: service_healthy
 services:
   postgres:
     image: postgres:15
@@ -17,12 +45,9 @@ services:
     restart: always
 
   airflow-init:
-    build: .
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+    # Hereda toda la config común con el merge key "<<"
+    <<: *airflow-common
+    # Sobreescribe entrypoint y command específicos de este servicio
     entrypoint: /bin/bash
     command:
       - -c
@@ -38,40 +63,14 @@ services:
     restart: on-failure
 
   airflow-webserver:
-    build: .
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      BCENTRAL_USER: ${BCENTRAL_USER}
-      BCENTRAL_PASSWORD: ${BCENTRAL_PASSWORD}
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./dbt_project:/opt/airflow/dbt_project
+    <<: *airflow-common
     ports:
       - "8080:8080"
     command: webserver
     restart: always
 
   airflow-scheduler:
-    build: .
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      BCENTRAL_USER: ${BCENTRAL_USER}
-      BCENTRAL_PASSWORD: ${BCENTRAL_PASSWORD}
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./dbt_project:/opt/airflow/dbt_project
+    <<: *airflow-common
     command: scheduler
     restart: always
 
