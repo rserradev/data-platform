@@ -42,3 +42,21 @@ CITIES = {
     "la_serena":   {"lat": -29.90, "lon": -71.25},
     "temuco":      {"lat": -38.73, "lon": -72.59},
 }
+
+def fetch_weather():
+       santiago = ZoneInfo("America/Santiago")
+       ayer = (datetime.now(santiago) - timedelta(days=1)).strftime("%Y-%m-%d")
+       fecha_ingesta = datetime.now(santiago).strftime("%Y-%m-%d")
+       print(f"Consultando clima para: {ayer}")
+       print(f"Fecha de ingesta: {fecha_ingesta}")
+
+with DAG(
+    "weather_pipeline",
+    start_date=datetime(2024, 6, 1),
+    schedule_interval="0 0 * * *",  # Ejecutar diariamente a medianoche
+    catchup=False,
+) as dag:
+    fetch_weather_task = PythonOperator(
+        task_id="fetch_weather",
+        python_callable=fetch_weather,
+    )
