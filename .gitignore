@@ -4,6 +4,7 @@ logs/
 # Archivos temporales de dbt
 dbt_project/target/
 dbt_project/dbt_packages/
+dbt_project/profiles/profiles.yml
 
 # Variables de entorno
 .env
