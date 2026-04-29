@@ -46,7 +46,6 @@ CITIES = {
     "temuco":      {"lat": -38.73, "lon": -72.59},
 }
 
-
 def fetch_weather():
     # Fecha de ayer en horario de Chile (T-1 ingestion pattern)
     santiago = ZoneInfo("America/Santiago")
