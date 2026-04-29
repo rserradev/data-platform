@@ -19,6 +19,9 @@ x-airflow-common: &airflow-common
     # Credenciales API Banco Central (ya las tenías)
     BCENTRAL_USER: ${BCENTRAL_USER}
     BCENTRAL_PASSWORD: ${BCENTRAL_PASSWORD}
+    # Credenciales para cliente S3 (MinIO)
+    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
