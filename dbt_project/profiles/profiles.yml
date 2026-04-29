@@ -4,9 +4,11 @@ crypto_pipeline:
     dev:
       type: postgres
       host: postgres
-      user: airflow
-      password: airflow
+      # Leer credenciales desde variables de entorno
+      # dbt resuelve {{ env_var('...') }} en tiempo de ejecución
+      user: "{{ env_var('POSTGRES_USER') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_DB') }}"
       port: 5432
-      dbname: airflow
       schema: public
       threads: 2
