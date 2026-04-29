@@ -16,7 +16,6 @@ import json
 BCENTRAL_USER = os.getenv("BCENTRAL_USER")
 BCENTRAL_PASSWORD = os.getenv("BCENTRAL_PASSWORD")
 
-
 # Conexión a la base de datos
 DB_CONN = {
     "host": "postgres",
@@ -111,7 +110,7 @@ def fetch_indicators():
 
 # Funcion para transformar datos a capa silver
 def transform_to_silver():
-    # Crear coneixón a MinIO
+    # Crear conexion a MinIO
     s3 = boto3.client("s3", **MINIO_CONN)
 
     fecha_santiago = ZoneInfo("America/Santiago")

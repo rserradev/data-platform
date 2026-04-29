@@ -16,12 +16,17 @@ x-airflow-common: &airflow-common
     AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER}
     AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD}
     AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_MAIL_FROM}
+    # Credenciales de Postgres expestas al codigo de los DAGs
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_DB: ${POSTGRES_DB}
     # Credenciales API Banco Central (ya las tenías)
     BCENTRAL_USER: ${BCENTRAL_USER}
     BCENTRAL_PASSWORD: ${BCENTRAL_PASSWORD}
     # Credenciales para cliente S3 (MinIO)
     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+    # 
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -63,7 +68,7 @@ services:
           --lastname User \
           --role Admin \
           --email admin@example.com
-    restart: on-failure
+    restart: "no"
 
   airflow-webserver:
     <<: *airflow-common
