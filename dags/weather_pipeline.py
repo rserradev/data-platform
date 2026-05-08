@@ -34,7 +34,7 @@ MINIO_CONN = {
 BUCKET = "weather-bronze"
 
 # URL base de la API Open-Meteo (endpoint archive = datos históricos consolidados)
-BASE_URL = "https://archive-api.open-meteo.com/v1/archive"
+BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
 # Ciudades a monitorear
 CITIES = {
@@ -67,6 +67,49 @@ def fetch_weather():
     except Exception:
         s3.create_bucket(Bucket=BUCKET)
         print(f"Bucket '{BUCKET}' creado")
+
+    # 3. Guardar cada ciudad como archivo Parquet en MinIO, con ruta organizada por ciudad y fecha
+    fecha = datetime.now(santiago).strftime("%Y-%m-%d")
+    timestamp = int(datetime.now(santiago).timestamp())
+
+    for city, coords in CITIES.items():
+        print(f"Consultando clima para {city} ({coords['lat']}, {coords['lon']})")
+        params = {
+            "latitude": coords["lat"],
+            "longitude": coords["lon"],
+            "hourly": "temperature_2m,precipitation",   # ← sin _sum
+            "past_days": 1,
+            "forecast_days": 1,
+            "timezone": "America/Santiago",
+        }
+        response = requests.get(BASE_URL, params=params, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        # Extraer solo el bloque "hourly" que tiene forma de columnas
+        hourly = data["hourly"]
+        n = len(hourly["time"])
+
+        # Construir el dict columnar para PyArrow, agregando metadata de ciudad
+        columns = {
+            "ciudad": [city] * n,
+            "latitud": [coords["lat"]] * n,
+            "longitud": [coords["lon"]] * n,
+            "fecha_ingesta": [fecha_ingesta] * n,
+            "time": hourly["time"],
+            "temperature_2m": hourly["temperature_2m"],
+            "precipitation": hourly["precipitation"],   # ← sin _sum
+        }
+
+        table = pa.Table.from_pydict(columns)
+        buffer = io.BytesIO()
+        pq.write_table(table, buffer)
+        buffer.seek(0)
+
+        # Guardar en MinIO con ruta organizada por ciudad y fecha
+        key = f"{city}/fecha={fecha_ingesta}/weather.parquet"
+        s3.upload_fileobj(buffer, BUCKET, key)
+        print(f"Clima de {city} guardado en MinIO como '{key}'")
 
 
 with DAG(
