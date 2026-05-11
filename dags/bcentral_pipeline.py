@@ -79,6 +79,7 @@ def fetch_indicators():
             "function": "GetSeries",
         }
 
+        # Hacer la solicitud a la API del Banco Central
         response = requests.get(BASE_URL, params=params, timeout=30)
         data = response.json()
         print(f"Indicador {nombre} recibido: {len(data['Series']['Obs'])} registros")
@@ -103,6 +104,7 @@ def fetch_indicators():
         pq.write_table(table, buffer)
         buffer.seek(0)
 
+        # Guardar en MinIO con ruta organizada por indicador y fecha
         key = f"indicators/{fecha_actual}/{nombre}_{ayer}.parquet"
         s3.put_object(Bucket=BUCKET, Key=key, Body=buffer.getvalue())
         print(f"MinIO: {nombre} → {key}")
