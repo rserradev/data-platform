@@ -46,6 +46,7 @@ CITIES = {
     "temuco":      {"lat": -38.73, "lon": -72.59},
 }
 
+# Función para traer datos de clima en capa bronze
 def fetch_weather():
     # Fecha de ayer en horario de Chile (T-1 ingestion pattern)
     santiago = ZoneInfo("America/Santiago")
@@ -111,6 +112,7 @@ def fetch_weather():
         s3.upload_fileobj(buffer, BUCKET, key)
         print(f"Clima de {city} guardado en MinIO como '{key}'")
 
+# Función para transformar los datos del clima a capa silver (ejemplo de transformación simple)
 def transform_to_silver():
     #Crear conexión a MinIO
     s3 = boto3.client("s3", **MINIO_CONN)
