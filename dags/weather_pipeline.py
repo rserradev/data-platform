@@ -111,6 +111,20 @@ def fetch_weather():
         s3.upload_fileobj(buffer, BUCKET, key)
         print(f"Clima de {city} guardado en MinIO como '{key}'")
 
+def transform_to_silver():
+    #Crear conexión a MinIO
+    s3 = boto3.client("s3", **MINIO_CONN)
+
+    fecha_santiago = ZoneInfo("America/Santiago")
+    fecha_actual = datetime.now(fecha_santiago).strftime("%Y-%m-%d")
+
+    # Listar objetos en el bucket para la fecha actual
+    response = s3.list_objects_v2(Bucket=BUCKET, Prefix=f"fecha={fecha_actual}/")
+    print(f"Archivos encontrados para fecha {fecha_actual}: {response.get('KeyCount', 0)}")
+
+    # Conectar a PostgreSQL
+    conn = psycopg2.connect(**DB_CONN)
+
 
 with DAG(
     "weather_pipeline",
